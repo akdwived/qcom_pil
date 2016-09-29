@@ -19,6 +19,7 @@
 #include <linux/firmware.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/qcom_scm.h>
 #include <linux/remoteproc.h>
 #include <linux/slab.h>
 
@@ -103,8 +104,11 @@ EXPORT_SYMBOL_GPL(qcom_mdt_parse);
 /**
  * qcom_mdt_load() - load the firmware which header is defined in fw
  * @rproc:	rproc handle
+ * @pas_id:	PAS identifier to load this firmware into
  * @fw:		frimware object for the header
- * @firmware:	filename of the firmware, for building .bXX names
+ * @mem_phys:	physical address of reserved memory region for the firmware
+ * @mem_region:	pointer to a mapping of the reserved memory region
+ * @mem_size:	size of the reserved memory region
  *
  * Returns 0 on success, negative errno otherwise.
  */

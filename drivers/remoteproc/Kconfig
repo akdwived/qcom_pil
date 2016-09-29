@@ -83,10 +83,8 @@ config QCOM_MDT_LOADER
 config QCOM_Q6V5_PIL
 	tristate "Qualcomm Hexagon V5 Peripherial Image Loader"
 	depends on OF && ARCH_QCOM
-	depends on QCOM_SMEM
-	select MFD_SYSCON
-	select QCOM_MDT_LOADER
 	select REMOTEPROC
+	select QCOM_MDT_LOADER
 	help
 	  Say y here to support the Qualcomm Peripherial Image Loader for the
 	  Hexagon V5 based remote processors.
@@ -99,5 +97,20 @@ config ST_REMOTEPROC
 	  Say y here to support ST's adjunct processors via the remote
 	  processor framework.
 	  This can be either built-in or a loadable module.
+
+config QCOM_MDT_LOADER
+	tristate
+
+
+
+config QCOM_TZ_PIL
+	tristate "Qualcomm TrustZone based Peripherial Image Loader"
+	depends on OF && ARCH_QCOM
+	select REMOTEPROC
+	select QCOM_MDT_LOADER
+	select QCOM_SCM
+	help
+	  Say y here to support the TrustZone based Qualcomm Peripherial Image
+	  Loader.
 
 endmenu
