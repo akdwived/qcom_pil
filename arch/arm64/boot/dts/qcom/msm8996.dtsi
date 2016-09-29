@@ -13,10 +13,15 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/clock/qcom,gcc-msm8996.h>
 #include <dt-bindings/clock/qcom,mmcc-msm8996.h>
+#include <dt-bindings/clock/qcom,rpmcc.h>
 
 / {
 	model = "Qualcomm Technologies, Inc. MSM8996";
 
+	qcom,msm-id = 	<291 0x30001>,
+			<246 0x0>,	
+			<0x00000131 0x00000038>;
+	qcom,pmic-id = <0x20009 0x2000A 0x0 0x0>, <0x00020009 0x00000003 0x00000003 0x00000000>;
 	interrupt-parent = <&intc>;
 
 	#address-cells = <2>;
@@ -28,6 +33,17 @@
 		device_type = "memory";
 		/* We expect the bootloader to fill in the reg */
 		reg = <0 0 0 0>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		vidc_mem: vidc_region@8ea00000 {
+			no-map;
+			reg = <0 0x8ea00000 0 0x2b00000>;
+		};
 	};
 
 	cpus {
@@ -365,6 +381,181 @@
 					       <960000000>,
 					       <825000000>;
 		};
+
+    firmware {
+                scm {
+                        compatible = "qcom,scm";
+                        clocks = <&rpmcc RPM_CE1_CLK>;
+                        clock-names = "core";
+                };
+        };
+	};
+
+	vidc_rproc: vidc_tzpil@0 {
+		compatible = "qcom,tz-pil";
+		clocks = <&mmcc VIDEO_CORE_CLK>, <&mmcc VIDEO_AHB_CLK>, <&mmcc VIDEO_AXI_CLK>, <&mmcc VIDEO_MAXI_CLK>;
+		clock-names = "core_clk", "iface_clk", "bus_clk", "maxi_clk";
+		power-domains = <&mmcc VENUS_GDSC>;
+		qcom,firmware-name = "venus";
+		qcom,pas-id = <9>;
+		memory-region = <&vidc_mem>;
+		status = "ok";
+	};
+
+	vidc-iommu-bus {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0 0 0xffffffff>;
+		dma-ranges = <0x70800000 0 0x70800000 0x6d400000>;
+		vidc: qcom,vidc@c00000 {
+			compatible = "qcom,msm-vidc";
+			reg = <0xC00000 0xff000>;
+			interrupts = <GIC_SPI 287 0>;
+			power-domains = <&mmcc VENUS_CORE1_GDSC>;
+
+			clocks = <&rpmcc RPM_MMAXI_CLK>,
+				 <&rpmcc RPM_MMAXI_A_CLK>,
+				 <&mmcc MMSS_MMAGIC_AHB_CLK>,
+				 <&mmcc SMMU_VIDEO_AHB_CLK>,
+				 <&mmcc SMMU_VIDEO_AXI_CLK>,
+				 <&mmcc MMAGIC_VIDEO_AXI_CLK>,
+				 <&mmcc VIDEO_CORE_CLK>,
+				 <&mmcc VIDEO_AHB_CLK>,
+				 <&mmcc VIDEO_AXI_CLK>,
+				 <&mmcc MMAGIC_VIDEO_NOC_CFG_AHB_CLK>,
+				 <&mmcc VIDEO_MAXI_CLK>,
+				 <&mmcc VIDEO_SUBCORE0_CLK>,
+				 <&mmcc VIDEO_SUBCORE1_CLK>,
+				 <&mmcc MMSS_MMAGIC_MAXI_CLK>;
+
+			clock-names = "rpm_mmaxi_clk", "rpm_mmaxi_a_clk",
+				      "mmagic_ahb_clk",
+				      "smmu_ahb_clk", "smmu_axi_clk",
+				      "mmagic_video_axi_clk",
+				      "core_clk", "iface_clk", "bus_clk",
+				      "mmagic_video_noc_cfg_ahb_clk",
+				      "maxi_clk", "core0_clk", "core1_clk",
+				      "mmss_mmagic_maxi_clk";
+
+			qcom,hfi = "venus";
+			rproc = <&vidc_rproc>;
+			iommus = <&venus_smmu 0x00>,
+				<&venus_smmu 0x01>,
+				<&venus_smmu 0x0a>,
+				<&venus_smmu 0x07>,
+				<&venus_smmu 0x0e>,
+				<&venus_smmu 0x0f>,
+				<&venus_smmu 0x08>,
+				<&venus_smmu 0x09>,
+				<&venus_smmu 0x0b>,
+				<&venus_smmu 0x0c>,
+				<&venus_smmu 0x0d>,
+				<&venus_smmu 0x10>,
+				<&venus_smmu 0x11>,
+				<&venus_smmu 0x21>,
+				<&venus_smmu 0x28>,
+				<&venus_smmu 0x29>,
+				<&venus_smmu 0x2b>,
+				<&venus_smmu 0x2c>,
+				<&venus_smmu 0x2d>,
+				<&venus_smmu 0x31>;
+	
+			status = "ok";
+		};
+
+	        vmem: qcom,vmem@880000 {
+	                compatible = "qcom,msm-vmem";
+	                interrupts = <GIC_SPI 429 IRQ_TYPE_LEVEL_HIGH>;
+
+        	        reg = <0x880000 0x800>,
+	                    <0x6800000 0x80000>;
+	                reg-names = "reg-base", "mem-base";
+
+			power-domains = <&mmcc MMAGIC_VIDEO_GDSC>;
+	                clocks = <&mmcc VMEM_AHB_CLK>,
+				 <&mmcc MMSS_MMAGIC_MAXI_CLK>,
+				 <&mmcc VMEM_MAXI_CLK>;
+	                clock-names = "ahb", "mmss_mmagic_maxi_clk", "vmem_maxi_clk";
+	                qcom,bank-size = <131072>; /* 128 kB */
+	        };
+	};
+
+	glink {
+		compatible = "qcom,glink";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0 0 0xffffffff>;
+
+		rpm {
+			qcom,glink-edge = "rpm";
+			interrupts = <0 168 1>;
+			qcom,irq-mask = <0x1>;
+			reg = <0x00068000 0x6000>,
+			      <0x09820010 0x4>;
+			reg-names = "msgram", "irq-reg-base";
+
+			rpm-requests {
+				compatible = "qcom,rpm-msm8996";
+				qcom,glink-channels = "rpm_requests";
+
+				rpmcc: qcom,rpmcc {
+					compatible = "qcom,rpmcc-msm8996", "qcom,rpmcc";
+					#clock-cells = <1>;
+				};
+
+				pm8994-regulators {
+					compatible = "qcom,rpm-pm8994-regulators";
+
+					pm8994_s1: s1 {};
+					pm8994_s2: s2 {};
+					pm8994_s3: s3 {};
+					pm8994_s4: s4 {};
+					pm8994_s5: s5 {};
+					pm8994_s6: s6 {};
+					pm8994_s7: s7 {};
+					pm8994_s8: s8 {};
+					pm8994_s9: s9 {};
+					pm8994_s10: s10 {};
+					pm8994_s12: s12 {};
+
+					pm8994_l1: l1 {};
+					pm8994_l2: l2 {};
+					pm8994_l3: l3 {};
+					pm8994_l4: l4 {};
+					pm8994_l5: l5 {};
+					pm8994_l6: l6 {};
+					pm8994_l7: l7 {};
+					pm8994_l8: l8 {};
+					pm8994_l9: l9 {};
+					pm8994_l10: l10 {};
+					pm8994_l11: l11 {};
+					pm8994_l12: l12 {};
+					pm8994_l13: l13 {};
+					pm8994_l14: l14 {};
+					pm8994_l15: l15 {};
+					pm8994_l16: l16 {};
+					pm8994_l17: l17 {};
+					pm8994_l18: l18 {};
+					pm8994_l19: l19 {};
+					pm8994_l20: l20 {};
+					pm8994_l21: l21 {};
+					pm8994_l22: l22 {};
+					pm8994_l23: l23 {};
+					pm8994_l24: l24 {};
+					pm8994_l25: l25 {};
+					pm8994_l26: l26 {};
+					pm8994_l27: l27 {};
+					pm8994_l28: l28 {};
+					pm8994_l29: l29 {};
+					pm8994_l30: l30 {};
+					pm8994_l31: l31 {};
+					pm8994_l32: l32 {};
+				};
+			};
+		};
 	};
 };
+#include "msm-arm-smmu-8996.dtsi"
 #include "msm8996-pins.dtsi"
+
