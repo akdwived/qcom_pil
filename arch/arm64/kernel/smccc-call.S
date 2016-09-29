@@ -16,10 +16,13 @@
 
 	.macro SMCCC instr
 	.cfi_startproc
-	\instr	#0
+1:	\instr	#0
+	cmp	x0, #1
+	beq	1b
 	ldr	x4, [sp]
 	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
 	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+	str	x6, [x4, #ARM_SMCCC_RES_X6_OFFS]
 	ret
 	.cfi_endproc
 	.endm

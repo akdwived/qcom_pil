@@ -1,4 +1,7 @@
-/* Copyright (c) 2010,2015, The Linux Foundation. All rights reserved.
+/*
+ * Qualcomm SCM driver
+ *
+ * Copyright (c) 2010,2015, The Linux Foundation. All rights reserved.
  * Copyright (C) 2015 Linaro Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -12,7 +15,7 @@
  *
  */
 #include <linux/platform_device.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/cpumask.h>
 #include <linux/export.h>
 #include <linux/dma-mapping.h>
@@ -201,12 +204,16 @@ int qcom_scm_pas_init_image(u32 peripheral, const void *metadata, size_t size)
 		dev_err(__scm->dev, "Allocation of metadata buffer failed.\n");
 		return -ENOMEM;
 	}
+
+	printk(KERN_ALERT"%s AD: mdata_phys %llx mdata_buf %llx size %x", __func__, mdata_phys, mdata_buf, size);
+
 	memcpy(mdata_buf, metadata, size);
 
 	ret = qcom_scm_clk_enable();
 	if (ret)
 		goto free_metadata;
 
+	printk("AD: calling __qcom_scm_pas_init_image with mdata_phys = %p mdata_buf = %p, peripheral = %d\n", mdata_phys, mdata_buf, peripheral);
 	ret = __qcom_scm_pas_init_image(__scm->dev, peripheral, mdata_phys);
 
 	qcom_scm_clk_disable();
@@ -322,10 +329,12 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	struct qcom_scm *scm;
 	int ret;
 
+	printk(KERN_ALERT"\n %s", __func__);
+
 	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
 	if (!scm)
 		return -ENOMEM;
-
+#if 0
 	scm->core_clk = devm_clk_get(&pdev->dev, "core");
 	if (IS_ERR(scm->core_clk)) {
 		if (PTR_ERR(scm->core_clk) == -EPROBE_DEFER)
@@ -333,6 +342,7 @@ static int qcom_scm_probe(struct platform_device *pdev)
 
 		scm->core_clk = NULL;
 	}
+
 
 	if (of_device_is_compatible(pdev->dev.of_node, "qcom,scm")) {
 		scm->iface_clk = devm_clk_get(&pdev->dev, "iface");
@@ -349,21 +359,24 @@ static int qcom_scm_probe(struct platform_device *pdev)
 			return PTR_ERR(scm->bus_clk);
 		}
 	}
-
+#endif
 	scm->reset.ops = &qcom_scm_pas_reset_ops;
 	scm->reset.nr_resets = 1;
 	scm->reset.of_node = pdev->dev.of_node;
 	reset_controller_register(&scm->reset);
 
+#if 0
 	/* vote for max clk rate for highest performance */
 	ret = clk_set_rate(scm->core_clk, INT_MAX);
 	if (ret)
 		return ret;
-
+#endif
 	__scm = scm;
 	__scm->dev = &pdev->dev;
 
 	__qcom_scm_init();
+
+	printk(KERN_ALERT" \n qcom_scm_probe done\n");
 
 	return 0;
 }
@@ -375,8 +388,6 @@ static const struct of_device_id qcom_scm_dt_match[] = {
 	{ .compatible = "qcom,scm",},
 	{}
 };
-
-MODULE_DEVICE_TABLE(of, qcom_scm_dt_match);
 
 static struct platform_driver qcom_scm_driver = {
 	.driver = {
@@ -416,12 +427,3 @@ static int __init qcom_scm_init(void)
 }
 
 subsys_initcall(qcom_scm_init);
-
-static void __exit qcom_scm_exit(void)
-{
-	platform_driver_unregister(&qcom_scm_driver);
-}
-module_exit(qcom_scm_exit);
-
-MODULE_DESCRIPTION("Qualcomm SCM driver");
-MODULE_LICENSE("GPL v2");

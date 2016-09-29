@@ -20,6 +20,8 @@
 #include <linux/arm-smccc.h>
 #include <linux/dma-mapping.h>
 
+#include <asm/compiler.h>
+#include <asm/smp_plat.h>
 #include "qcom_scm.h"
 
 #define QCOM_SCM_FNID(s, c) ((((s) & 0xFF) << 8) | ((c) & 0xFF))
@@ -69,6 +71,15 @@ static DEFINE_MUTEX(qcom_scm_lock);
 #define N_EXT_QCOM_SCM_ARGS 7
 #define FIRST_EXT_ARG_IDX 3
 #define N_REGISTER_ARGS (MAX_QCOM_SCM_ARGS - N_EXT_QCOM_SCM_ARGS + 1)
+
+
+#define R0_STR "x0"
+#define R1_STR "x1"
+#define R2_STR "x2"
+#define R3_STR "x3"
+#define R4_STR "x4"
+#define R5_STR "x5"
+#define R6_STR "x6"
 
 /**
  * qcom_scm_call() - Invoke a syscall in the secure world
@@ -131,12 +142,17 @@ static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
 					 qcom_smccc_convention,
 					 ARM_SMCCC_OWNER_SIP, fn_id);
 
+		res->a6 = 0;
+
 		do {
-			arm_smccc_smc(cmd, desc->arginfo, desc->args[0],
-				      desc->args[1], desc->args[2], x5, 0, 0,
-				      res);
+						if (res->a0 == QCOM_SCM_INTERRUPTED)
+							cmd = res->a0;
+                       arm_smccc_smc(cmd, desc->arginfo, desc->args[0],
+                                     desc->args[1], desc->args[2], x5, res->a6, 0,
+				     res);
 		} while (res->a0 == QCOM_SCM_INTERRUPTED);
 
+		printk(KERN_ALERT"\n arm_smccc_smc res %d", res->a0);
 		mutex_unlock(&qcom_scm_lock);
 
 		if (res->a0 == QCOM_SCM_V2_EBUSY) {
@@ -288,9 +304,11 @@ int __qcom_scm_pas_init_image(struct device *dev, u32 peripheral,
 	desc.args[1] = metadata_phys;
 	desc.arginfo = QCOM_SCM_ARGS(2, QCOM_SCM_VAL, QCOM_SCM_RW);
 
+	printk(KERN_ALERT"\n_ AD: _qcom_scm_pas_init_image");
 	ret = qcom_scm_call(dev, QCOM_SCM_SVC_PIL, QCOM_SCM_PAS_INIT_IMAGE_CMD,
 				&desc, &res);
 
+	printk(KERN_ALERT"\n AD: __qcom_scm_pas_init_image passed %d", res.a1);
 	return ret ? : res.a1;
 }
 
